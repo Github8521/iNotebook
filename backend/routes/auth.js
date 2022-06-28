@@ -5,8 +5,9 @@ const jwt = require("jsonwebtoken");
 const { body, validationResult } = require("express-validator");
 const router = express.Router();
 const JWT_SECRET = "herry is a good boy";
+const fechuser=require('../middleware/fechuser')
 
-// endpoint for signup
+// endpoint for signup using POST
 router.post(
   "/createuser",
   [
@@ -15,6 +16,8 @@ router.post(
     body("password", "password must be atleast 5 characters").isLength({ min:5}),
   ],
   async (req, res) => {
+    let success=false
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -22,9 +25,7 @@ router.post(
     try {
       let user = await User.findOne({ email: req.body.email });
       if (user) {
-        return res
-          .status(400)
-          .json({ error: "sorry a user with this email is already exist" });
+        return res.status(400).json({success, error: "sorry a user with this email is already exist" });
       }
       const salt = await bcrypt.genSalt(10);
       secPass = await bcrypt.hash(req.body.password, salt);
@@ -38,14 +39,15 @@ router.post(
       };
       const authtoken = jwt.sign(data, JWT_SECRET);
       // res.json(user)
-      res.json({ authtoken });
+      success=true
+      res.json({success, authtoken });
     } catch (error) {
       console.error(error.message);
       res.status(500).send("internal server error");
     }
   }
 );
-// endpoint for login
+// endpoint for login using POST
 router.post(
   "/login",
   [
@@ -53,6 +55,7 @@ router.post(
     body("password", "password cannot be blank").exists(),
   ],
   async (req, res) => {
+    let success=false
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -61,11 +64,11 @@ router.post(
     try {
         let user=await User.findOne({email})
         if(!user){
-            return   res.status(400).json({error:"please try to login with correct crendential"})
+            return   res.status(400).json(success ,{error:"please try to login with correct crendential"})
         }
         const comparepassword=await bcrypt.compare(password,user.password)
         if(!comparepassword){
-            return   res.status(400).json({error:"please try to login with correct crendential"})
+            return   res.status(400).json({success, error:"please try to login with correct crendential"})
 
           
         }
@@ -73,7 +76,9 @@ router.post(
             user: { id: user.id },
           };
           const authtoken = jwt.sign(data, JWT_SECRET);
-      res.json({ authtoken });
+       success=true
+           
+      res.json({success, authtoken });
 
     }  catch (error) {
         console.error(error.message);
@@ -81,5 +86,23 @@ router.post(
       }
 
 })
+
+
+// endpoint for userdetail using POST. login required
+
+router.post(
+  "/getuser",fechuser,async (req, res) => {
+try {
+  userId=req.user.id
+ 
+  const user=await User.findById(userId).select('-password')
+  res.send(user)
+
+  
+} catch (error) {
+  console.error(error.message);
+  res.status(500).send("internal server error");
+}
+  })
 
 module.exports = router;
